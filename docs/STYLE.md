@@ -105,6 +105,21 @@ At minimum, consider:
 
 The answer does not need to be heavyweight. Small local tools can use simple limits, bounded retries, documented defaults, and focused tests. What is not acceptable is shipping unbounded data growth, silent data loss, hidden lock contention, or secret exposure because the happy path worked.
 
+### 1.6 Ship production-ready code only
+
+All code merged into this repository must be production-ready and shippable for the behavior it exposes. Do not commit placeholders, temporary implementations, fake runtime behavior, scaffold stubs, TODO-driven branches, or "good enough for now" code on any shipped path.
+
+Forbidden in production code:
+
+- functions that return canned data instead of performing the specified behavior;
+- commands or APIs that exist only to satisfy a checklist but do not work;
+- `todo!()`, `unimplemented!()`, placeholder panics, or silent no-op branches for required behavior;
+- comments promising future work in place of implemented behavior;
+- temporary fallbacks that hide install, configuration, storage, network, or permission failures;
+- tests that pass by exercising a fake path while the real shipped path remains incomplete.
+
+If a capability is intentionally deferred, exclude it from the shipped interface or make the unsupported state explicit and testable through a clear error. A deferred feature may appear in documentation only as roadmap or non-goal text, not as an available command, API, hook, or tool.
+
 ---
 
 ## 2. Repository Structure
