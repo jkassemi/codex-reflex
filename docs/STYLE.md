@@ -844,3 +844,12 @@ That means:
 
 The goal is not to write the cleverest Rust. The goal is to create a codebase that a capable agent can safely understand, modify, and verify.
 
+--
+
+## 15. Local constraints are not product requirements
+
+The implementation environment (offline sandbox, missing toolchains, unavailable libraries, missing credentials, CI restrictions, temporary
+build failures, etc.) is not the product environment. 
+
+Do not simplify or redesign the architecture merely because the current execution environment is limited. Make reasonable attempts to
+satisfy dependencies.
