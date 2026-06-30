@@ -1,0 +1,21 @@
+{
+  "name": "reflex",
+  "version": "0.1.0",
+  "description": "Operational repair memory for OpenAI Codex CLI tool calls.",
+  "author": {
+    "name": "James Kassemi"
+  },
+  "license": "MIT OR Apache-2.0",
+  "keywords": ["codex", "plugin", "mcp", "tool-use", "memory"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Reflex",
+    "shortDescription": "Codex learns from failed tool calls.",
+    "longDescription": "Reflex records failed tool-call episodes, lets Codex register reusable repairs, and injects concise scoped hints before similar future tool calls.",
+    "defaultPrompt": "Use Reflex to remember reusable operational repairs after failed supported Codex tool calls are successfully fixed.",
+    "developerName": "James Kassemi",
+    "category": "Developer Tools",
+    "capabilities": ["Read", "Write"]
+  }
+}

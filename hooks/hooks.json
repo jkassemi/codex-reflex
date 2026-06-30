@@ -1,0 +1,80 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${PLUGIN_ROOT}/bin/reflex hook session-start",
+            "timeout": 2,
+            "statusMessage": "Starting Reflex"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${PLUGIN_ROOT}/bin/reflex hook user-prompt-submit",
+            "timeout": 2,
+            "statusMessage": "Recording task intent"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|apply_patch|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${PLUGIN_ROOT}/bin/reflex hook pre-tool-use",
+            "timeout": 2,
+            "statusMessage": "Checking Reflex"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|apply_patch|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${PLUGIN_ROOT}/bin/reflex hook post-tool-use",
+            "timeout": 3,
+            "statusMessage": "Recording Reflex result"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "Bash|apply_patch|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${PLUGIN_ROOT}/bin/reflex hook permission-request",
+            "timeout": 2,
+            "statusMessage": "Checking Reflex approval memory"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${PLUGIN_ROOT}/bin/reflex hook stop",
+            "timeout": 5,
+            "statusMessage": "Finalizing Reflex episodes"
+          }
+        ]
+      }
+    ]
+  }
+}

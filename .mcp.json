@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "reflex": {
+      "command": "./bin/reflex-mcp",
+      "cwd": ".",
+      "args": ["--stdio"]
+    }
+  }
+}

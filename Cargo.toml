@@ -1,0 +1,27 @@
+[package]
+name = "reflex"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Operational repair memory for Codex tool calls."
+
+[lib]
+name = "reflex"
+path = "src/lib.rs"
+
+[[bin]]
+name = "reflex"
+path = "src/bin/reflex.rs"
+
+[[bin]]
+name = "reflex-mcp"
+path = "src/bin/reflex_mcp.rs"
+
+[dependencies]
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+
+[dev-dependencies]
+tempfile = "3"

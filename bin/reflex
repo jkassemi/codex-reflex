@@ -1,0 +1,38 @@
+#!/usr/bin/env sh
+set -eu
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+
+if [ -z "${PLUGIN_DATA+x}" ] && [ -z "${REFLEX_DATA+x}" ]; then
+  plugin_dir="$(dirname -- "$ROOT")"
+  marketplace_dir="$(dirname -- "$plugin_dir")"
+  cache_dir="$(dirname -- "$marketplace_dir")"
+  plugins_dir="$(dirname -- "$cache_dir")"
+  codex_home="$(dirname -- "$plugins_dir")"
+  if [ "$(basename -- "$cache_dir")" = "cache" ] && [ "$(basename -- "$plugins_dir")" = "plugins" ]; then
+    export REFLEX_DATA="$codex_home/plugins/data/$(basename -- "$plugin_dir")-$(basename -- "$marketplace_dir")"
+  fi
+fi
+
+case "$(uname -s 2>/dev/null)-$(uname -m 2>/dev/null)" in
+  Linux-x86_64) target="x86_64-unknown-linux-gnu" ;;
+  Linux-aarch64|Linux-arm64) target="aarch64-unknown-linux-gnu" ;;
+  Darwin-arm64) target="aarch64-apple-darwin" ;;
+  Darwin-x86_64) target="x86_64-apple-darwin" ;;
+  *) target="" ;;
+esac
+
+if [ -n "$target" ] && [ -x "$ROOT/bin/prebuilt/$target/reflex" ]; then
+  exec "$ROOT/bin/prebuilt/$target/reflex" "$@"
+fi
+
+if [ -x "$ROOT/target/release/reflex" ]; then
+  exec "$ROOT/target/release/reflex" "$@"
+fi
+
+if [ -x "$ROOT/target/debug/reflex" ]; then
+  exec "$ROOT/target/debug/reflex" "$@"
+fi
+
+echo "reflex binary is not available for this platform. Release packages must include a prebuilt binary, or developers can run: scripts/build-prebuilt-binaries.sh" >&2
+exit 127

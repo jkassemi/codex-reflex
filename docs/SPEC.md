@@ -179,7 +179,8 @@ PreToolUse
   → summarize pending tool call
   → retrieve candidate lessons
   → apply scope/risk/filtering
-  → inject at most 1-2 concise hints
+  → block commands that violate required predicates and provide the preferred command
+  → otherwise inject at most 1-2 concise hints
 ```
 
 Example injected context:
@@ -188,7 +189,7 @@ Example injected context:
 Reflex: Similar AWS EKS commands in this repo previously failed without explicit profile/region and later succeeded with `--profile platform-admin --region us-east-1`.
 ```
 
-Codex supports returning `hookSpecificOutput.additionalContext` from `PreToolUse` so the hint becomes model-visible developer context before the pending tool call runs. ([OpenAI Developers][2])
+Codex supports returning `hookSpecificOutput.additionalContext` from `PreToolUse` so the hint becomes model-visible developer context before the pending tool call runs. For a required predicate violation, Reflex must return a blocking decision with a reason containing the preferred command and must not also return identical `additionalContext`. ([OpenAI Developers][2])
 
 ## 4.2 `PostToolUse`: check after every supported tool call
 
@@ -219,11 +220,11 @@ Default behavior:
 
 ```text
 record only
-defer to normal Codex approval flow
+defer to normal Codex approval flow by returning no decision field
 never auto-approve by default
 ```
 
-Codex’s `PermissionRequest` can allow, deny, or defer to the normal approval prompt; if multiple matching hooks return decisions, any deny wins, while an allow proceeds without surfacing the normal prompt. ([OpenAI Developers][2])
+Codex’s `PermissionRequest` can allow, deny, or defer to the normal approval prompt; Reflex’s default defer path must omit a decision field rather than returning an invented `defer` decision. If multiple matching hooks return decisions, any deny wins, while an allow proceeds without surfacing the normal prompt. ([OpenAI Developers][2])
 
 ## 4.4 `Stop`: close and analyze unresolved episodes
 
@@ -249,7 +250,7 @@ Use these hooks in v1:
 | -------------------------------- | -----------: | -------------------------------------------------------------------------------- | -------------------------------------------------------- |
 | `SessionStart`                   |          Yes | Initialize project state and optionally add one-line Reflex availability context | Minimal `additionalContext` only                         |
 | `UserPromptSubmit`               | Nice-to-have | Record task intent and user corrections like “that worked” / “use profile X”     | Usually no output                                        |
-| `PreToolUse`                     |          Yes | Retrieve relevant lessons before pending tool calls                              | Inject concise `additionalContext`; hint-only by default |
+| `PreToolUse`                     |          Yes | Retrieve relevant lessons before pending tool calls                              | Block required predicate violations; otherwise inject concise `additionalContext` |
 | `PostToolUse`                    |          Yes | Record attempts, open/extend/resolve episodes                                    | Usually silent; sometimes one-line “case recorded”       |
 | `PermissionRequest`              |          Yes | Record escalation/network/write approval patterns                                | Defer by default; policy-based deny/allow optional       |
 | `Stop`                           |          Yes | Finalize episodes, enqueue/analyze, write audit logs                             | Silent unless error                                      |
@@ -279,7 +280,7 @@ The first 512 characters should be self-contained because Codex uses MCP server 
 Suggested MCP server instructions:
 
 ```text
-Use Reflex after you encounter one or more failed tool calls and later discover a reusable correction. Do not call it for every failure. Call register_repair_episode only after a repair succeeds or the user confirms the fix. Never store secrets, tokens, private keys, session cookies, one-time URLs, or broad rules such as “always use sudo.”
+Use Reflex after you encounter one or more failed tool calls and later discover a reusable correction. Do not call it for every failure. Call register_repair_episode only after a repair succeeds or the user confirms the fix. Do not register a new lesson when a Reflex block already supplied the repair command. Never store secrets, tokens, private keys, session cookies, one-time URLs, or broad rules such as “always use sudo.”
 ```
 
 ## 6.3 Tools
@@ -306,6 +307,7 @@ Input schema:
     "lesson_hint",
     "trigger_description",
     "avoid_when",
+    "predicates",
     "scope",
     "risk_level",
     "confidence"
@@ -342,6 +344,72 @@ Input schema:
       "items": { "type": "string", "maxLength": 240 },
       "maxItems": 5
     },
+    "predicates": {
+      "type": "object",
+      "description": "Structured applicability and satisfaction predicates inferred by the main model. Runtime hooks use these predicates deterministically.",
+      "additionalProperties": false,
+      "properties": {
+        "tool_family": {
+          "type": ["string", "null"],
+          "description": "Tool family this lesson applies to, such as Bash."
+        },
+        "command_family": {
+          "type": ["string", "null"],
+          "description": "Stable command family, such as pytest, npm, cargo, or aws."
+        },
+        "match_executables": {
+          "type": "array",
+          "items": { "type": "string" },
+          "maxItems": 8
+        },
+        "required_env": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "required_cwd": {
+          "type": ["string", "null"]
+        },
+        "preferred_command": {
+          "type": ["string", "null"]
+        },
+        "suppress_when": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "env": {
+              "type": "object",
+              "additionalProperties": { "type": "string" }
+            },
+            "command_contains": {
+              "type": "array",
+              "items": { "type": "string" },
+              "maxItems": 8
+            },
+            "executable": {
+              "type": ["string", "null"]
+            }
+          }
+        },
+        "block_when": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "env": {
+              "type": "object",
+              "additionalProperties": { "type": "string" }
+            },
+            "command_contains": {
+              "type": "array",
+              "items": { "type": "string" },
+              "maxItems": 8
+            },
+            "executable": {
+              "type": ["string", "null"]
+            }
+          }
+        }
+      }
+    },
     "scope": {
       "type": "string",
       "enum": ["project", "repo", "machine", "user", "org", "unknown"]
@@ -365,7 +433,7 @@ Behavior:
 1. Resolve case_id if supplied.
 2. Attach recent failed/successful attempts as evidence.
 3. Redact again.
-4. Store candidate lesson.
+4. Store candidate lesson with text hint and structured predicates.
 5. Return lesson id and status.
 ```
 
@@ -572,7 +640,10 @@ contradicted three times
 
 # 9. Lesson matching
 
-Do not require command regexes. Use a layered matcher.
+Lesson registration captures the model’s causal reasoning as structured
+predicates. Runtime matching uses those predicates deterministically. Working
+directory and project identity are scope signals, not sufficient
+evidence that a lesson is relevant.
 
 ## 9.1 Cheap retrieval
 
@@ -585,7 +656,7 @@ scope
 tool_name
 executable tokens
 MCP server/tool name
-cwd tokens
+cwd / repo-root scope
 lesson text tokens
 trigger text tokens
 recent error tokens
@@ -593,19 +664,47 @@ recent error tokens
 
 ## 9.2 Semantic-lite matching
 
-For v1, do this without embeddings:
+Use this order:
 
 ```text
-BM25/token overlap over:
-  pending command
-  tool name
-  cwd
-  user intent excerpt
-  trigger_description
-  lesson_hint
+hard scope gate:
+  project_hash / repo identity
+  scope
+
+structured predicate gate:
+  tool_family
+  command_family or match_executables
+  required_cwd
+
+structured satisfaction gate:
+  required_env
+  suppress_when.env
+  suppress_when.command_contains
+  suppress_when.executable
+
+ignore low-value specificity:
+  cwd tokens after the scope gate
+  individual pytest node ids
+  long file lists
+  verbosity flags such as -q and --tb=short
 ```
 
-Later, add optional embeddings.
+Structured predicates must include `command_family` or at least one
+`match_executables` entry. `tool_family` alone is too broad to authorize
+injection.
+
+When `preferred_command` is present, injected context must put that command
+form before the prose hint.
+
+When a matching lesson has `required_env` and the pending command does not
+satisfy it, `PreToolUse` must block the command and put `preferred_command` in
+the block reason. The original command must not run. The block reason must tell
+the model not to call `register_repair_episode` for the same Reflex-provided
+repair.
+
+`required_env` is authoritative. If it is present, `suppress_when` command text
+fragments must not suppress a block unless the pending command also satisfies
+the required environment.
 
 ## 9.3 Applicability filter
 
@@ -613,11 +712,49 @@ A lesson can be injected only if:
 
 ```text
 scope matches
+tool family matches when specified
+command profile or structured predicate is close enough
 status is candidate or active
 risk policy allows hinting
 anti-trigger does not match
+pending command does not already satisfy the lesson
 lesson has not recently failed
 confidence exceeds threshold
+```
+
+“Already satisfies” means the pending command visibly contains the operational
+requirement the lesson would tell the model to add. Structured predicates are
+authoritative for this check.
+
+Example predicate payload:
+
+```json
+{
+  "tool_family": "Bash",
+  "command_family": "pytest",
+  "match_executables": ["pytest", "./.venv/bin/pytest", "python"],
+  "required_env": {
+    "PYTHONPATH": "/home/james/m19"
+  },
+  "required_cwd": "/home/james/m19",
+  "preferred_command": "PYTHONPATH=/home/james/m19 ./.venv/bin/pytest",
+  "suppress_when": {
+    "env": {
+      "PYTHONPATH": "/home/james/m19"
+    }
+  }
+}
+```
+
+Examples:
+
+```text
+pytest lesson in /home/james/m19:
+  block:      pytest
+  block:      ./.venv/bin/pytest tests/foo.py -q
+  do not:     PYTHONPATH=/home/james/m19 ./.venv/bin/pytest
+  do not:     sed -n '1,220p' .../SKILL.md
+  do not:     mcp__reflex__register_repair_episode(...)
 ```
 
 Thresholds:
@@ -1119,16 +1256,17 @@ Plugin-bundled hooks are not automatically trusted; installing or enabling Refle
 
 ```json
 {
-  "mcp_servers": {
+  "mcpServers": {
     "reflex": {
-      "command": "reflex-mcp",
+      "command": "./bin/reflex-mcp",
+      "cwd": ".",
       "args": ["--stdio"]
     }
   }
 }
 ```
 
-If relative binary resolution is unreliable in practice, the installer should generate or patch this to an absolute path inside the installed plugin cache, or use a wrapper script under `${PLUGIN_ROOT}` if Codex’s plugin MCP launcher supports expansion for the command field in your target version. The docs clearly show plugin-bundled `.mcp.json` support, but they do not spell out `${PLUGIN_ROOT}` expansion for MCP command fields the way they do for hook commands, so implementation should verify this locally. ([OpenAI Developers][1])
+The command must launch the packaged wrapper from the installed plugin root, and `cwd` must resolve inside the installed plugin cache. Do not use `${PLUGIN_ROOT}` in plugin MCP command fields; local install validation must prove Codex reports `./bin/reflex-mcp` with a plugin-cache `cwd` before release. ([OpenAI Developers][1])
 
 ---
 
@@ -1143,6 +1281,8 @@ Use Reflex to preserve reusable operational repairs from failed tool calls.
 
 When a tool call fails, do not immediately record a lesson. Continue diagnosing normally.
 
+If Reflex blocks a tool call and supplies the replacement command, use that command without registering a new lesson for the same repair.
+
 After you discover a correction and a later attempt succeeds, call the Reflex MCP tool `register_repair_episode` if the correction is likely reusable. Good examples include:
 - corrected CLI flags
 - correct profile/region/context
@@ -1156,6 +1296,7 @@ Do not record:
 - secrets, tokens, private keys, cookies, one-time URLs
 - broad rules like “always use sudo”
 - ordinary code/test failures whose fix was changing product code
+- repairs Reflex already supplied through a blocking hook response
 - guesses that have not succeeded
 
 Keep lessons scoped, concise, and falsifiable.
@@ -1447,9 +1588,10 @@ README installation instructions must include:
   health-check command
 
 The repository must include a local release gate that developers run on their own machines.
-The local release gate must include formatting, tests, plugin validation, and prebuilt binary generation.
+The local release gate must include formatting, tests, plugin validation, prebuilt binary generation, and a fresh Codex plugin install smoke test.
 The repository must include a tracked pre-commit hook that runs the local release gate for changed commits.
 The pre-commit hook must build the packaged `reflex` and `reflex-mcp` binaries for the installed subset of the common prebuild targets on the developer machine.
+The plugin install smoke test must add the marketplace in an isolated `CODEX_HOME`, install `reflex@codex-reflex`, verify the bundled MCP server resolves to the installed plugin cache, and run the packaged wrappers.
 The common prebuild targets are `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin`, and `aarch64-apple-darwin`.
 Public release maintainers must run the local prebuild script in strict mode with every public release target configured before publishing.
 Public releases must provide prebuilt binaries for the common supported platforms, or explicitly document any unsupported platform.
