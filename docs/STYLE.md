@@ -89,6 +89,22 @@ Line coverage is useful only as a secondary signal. If uncovered code is found, 
 
 A test that increases line coverage but does not protect specified behavior is not valuable.
 
+### 1.5 Consider operational risks within reason
+
+Every feature that records data, runs automatically, talks to external systems, or sits on a hot path must include a bounded operational-risk pass before it is considered complete.
+
+At minimum, consider:
+
+- storage growth, retention, compaction, and export/purge behavior;
+- concurrency, locking, retry, timeout, and partial-failure behavior;
+- latency budgets for hooks, CLIs, servers, and user-facing workflows;
+- privacy and redaction failure modes, including new secret formats;
+- compatibility with versioned schemas, migrations, and real payload variants;
+- observability through status, doctor, logs, or inspection commands;
+- install/update behavior and what fails if generated binaries or dependencies are absent.
+
+The answer does not need to be heavyweight. Small local tools can use simple limits, bounded retries, documented defaults, and focused tests. What is not acceptable is shipping unbounded data growth, silent data loss, hidden lock contention, or secret exposure because the happy path worked.
+
 ---
 
 ## 2. Repository Structure
