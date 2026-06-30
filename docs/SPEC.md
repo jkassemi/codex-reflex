@@ -1429,7 +1429,35 @@ Expected:
 No operational lesson unless the model explicitly registers a valid operational repair.
 ```
 
-# 23. Important implementation detail
+---
+
+# 23. Public release requirements
+
+Reflex must be releasable as a public Git-backed Codex marketplace package without relying on remote CI.
+
+Public distribution requirements:
+
+```text
+README installation instructions must be prominently placed before advanced usage.
+README installation instructions must include:
+  public marketplace install path
+  local developer install path
+  hook trust requirement
+  binary/prebuild requirement
+  health-check command
+
+The repository must include a local release gate that developers run on their own machines.
+The local release gate must include formatting, tests, plugin validation, and prebuilt binary generation.
+The repository must include a tracked pre-commit hook that runs the local release gate for changed commits.
+The pre-commit hook must build the packaged `reflex` and `reflex-mcp` binaries for the installed subset of the common prebuild targets on the developer machine.
+The common prebuild targets are `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin`, and `aarch64-apple-darwin`.
+Public release maintainers must run the local prebuild script in strict mode with every public release target configured before publishing.
+Public releases must provide prebuilt binaries for the common supported platforms, or explicitly document any unsupported platform.
+Do not require users to run `cargo build` after installing a public release package.
+Do not add remote CI as a required release mechanism for v1.
+```
+
+# 24. Important implementation detail
 
 When Codex hits a failure, **do not make Reflex ask the model “what happened?” immediately.**
 
