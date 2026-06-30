@@ -1000,10 +1000,9 @@ reflex-for-codex/
     "name": "James Kassemi"
   },
   "license": "MIT OR Apache-2.0",
-  "keywords": ["codex", "plugin", "mcp", "hooks", "tool-use", "memory"],
+  "keywords": ["codex", "plugin", "mcp", "tool-use", "memory"],
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
-  "hooks": "./hooks/hooks.json",
   "interface": {
     "displayName": "Reflex",
     "shortDescription": "Codex learns from failed tool calls.",
@@ -1015,7 +1014,15 @@ reflex-for-codex/
 }
 ```
 
-Plugin structure and manifest paths should follow Codex’s plugin packaging rules: `.codex-plugin/plugin.json` is the required entry point, while `skills`, `mcpServers`, `apps`, and `hooks` point to plugin-root-relative components. ([OpenAI Developers][1])
+Reflex uses the default plugin-bundled hook location `hooks/hooks.json`; the plugin manifest intentionally omits a `hooks` field for validator compatibility.
+
+Plugin structure and manifest paths should follow Codex’s plugin packaging rules: `.codex-plugin/plugin.json` is the required entry point, while `skills`, `mcpServers`, and `apps` point to plugin-root-relative components. ([OpenAI Developers][1])
+
+## 15.1 Hook discovery compatibility
+
+`hooks/hooks.json` remains required in the package, but `.codex-plugin/plugin.json` should not point to it by default. Codex discovers `hooks/hooks.json` automatically when the plugin is enabled.
+
+The manifest `hooks` field is only needed to override the default hook location or use multiple/inline hook definitions. Because local plugin-creator validation may reject the explicit field, v1 omits it unless local install validation proves it is accepted.
 
 ---
 
@@ -1104,7 +1111,7 @@ Plugin structure and manifest paths should follow Codex’s plugin packaging rul
 }
 ```
 
-Plugin-bundled hooks are not automatically trusted; Codex skips non-managed plugin hooks until the user reviews and trusts the current hook definition. That should be called out in the README installation steps. ([OpenAI Developers][1])
+Plugin-bundled hooks are not automatically trusted; installing or enabling Reflex does not by itself make bundled hooks run. Codex skips non-managed plugin hooks until the user reviews and trusts the current hook definition, so the README installation steps must require users to review and trust the Reflex hook definitions before expecting hooks to run. If hooks do not appear to run, check hook trust and enablement first. ([OpenAI Developers][1])
 
 ---
 
@@ -1322,6 +1329,16 @@ production/staging target changes
 ---
 
 # 22. Acceptance tests
+
+Validation and install acceptance:
+
+```text
+hooks/hooks.json exists and validates.
+plugin.json validates without a hooks field.
+Local Codex install/validation succeeds.
+README hook trust/install documentation is present.
+After hook trust, SessionStart, PreToolUse, PostToolUse, PermissionRequest, and Stop hooks are callable.
+```
 
 Build fixtures for three demos.
 
