@@ -12,6 +12,8 @@ Documentation is useful only when it clarifies durable intent. The primary sourc
 
 The code should be easy to read, easy to locate, easy to test, and easy to change without preserving accidental implementation details.
 
+Documentation must add durable intent or operational guidance; do not restate mechanically discoverable facts such as file inventories, command lists, schemas, or code structure.
+
 ---
 
 ## 1. Core Principles
